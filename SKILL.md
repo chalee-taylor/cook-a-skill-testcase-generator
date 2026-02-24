@@ -2,11 +2,11 @@
 name: testcase-generator
 version: 1.1.0
 description: >
-  Automatically generate test cases from a spec/requirement document. Activated when
-  the user asks to gnerate test cases, write test cases, produce test cases,
-  do feature testing, or provide a spec/PRD/BRS/User Story and wants a complete
-  test case suite. Supports Markdown, JSON, and CSV outputs. Automatically
-  detects edge cases, security cases, and generates a traceability matrix.
+  Automatically generates test cases from a spec/requirement document. Activated when
+  the user asks to generate/write/produce test cases, requests feature testing,
+  or shares a spec/PRD/BRS/User Story and asks for a complete test case suite.
+  Supports Markdown, JSON, and CSV outputs. Automatically detects edge cases,
+  security cases, and generates a traceability matrix.
 ---
 
 # Test Case Generator Skill
@@ -16,7 +16,6 @@ When provided with a feature spec, you read deeply, analyze the logic, and
 produce a set of **complete, structured, non-vague, non-duplicate** test cases.
 
 ---
-
 
 ## Input Parameters
 
@@ -57,144 +56,144 @@ A **PII Masking Report** is produced with counts of fields masked.
 
 ---
 
-### BƯỚC 1 — Input Validation
+### Step 1 — Input Validation
 
-Kiểm tra trước khi xử lý. Nếu fail, **dừng ngay**, không sinh output:
+Validate the input before processing. If any check fails, **stop immediately** and do not generate output:
 
-| Điều kiện | Lỗi |
+| Condition | Error |
 |---|---|
-| `spec_content` rỗng | `ERR-001: spec_content is required and cannot be empty` |
-| Có ký tự không hợp lệ | `ERR-002: spec_content contains invalid characters or encoding` |
-| Độ dài < 50 ký tự | `ERR-003: spec_content is too short (min 50 chars)` |
-| `output_format` không hợp lệ | `ERR-004: Invalid output_format. Allowed: markdown, json, csv` |
-| `coverage_level` không hợp lệ | `ERR-005: Invalid coverage_level. Allowed: basic, standard, full` |
+| `spec_content` is empty | `ERR-001: spec_content is required and cannot be empty` |
+| Invalid characters/encoding detected | `ERR-002: spec_content contains invalid characters or encoding` |
+| Length < 50 characters | `ERR-003: spec_content is too short (min 50 chars)` |
+| Invalid `output_format` | `ERR-004: Invalid output_format. Allowed: markdown, json, csv` |
+| Invalid `coverage_level` | `ERR-005: Invalid coverage_level. Allowed: basic, standard, full` |
 
-**Spec Quality Check** — Nếu spec thiếu một trong hai yếu tố sau, trả về `WARN-001` và **dừng**:
-- User flow / action sequence (ít nhất 1 luồng)
-- Business rule / validation condition (ít nhất 1 quy tắc)
+**Spec Quality Check** — If the spec is missing either of the following, return `WARN-001` and **stop**:
+- User flow / action sequence (at least 1 flow)
+- Business rule / validation condition (at least 1 rule)
 
 ```
 ⚠️ WARN-001: SPEC QUALITY WARNING
-Spec thiếu:
-- [ ] Không tìm thấy user flow hoặc action sequence
-- [ ] Không tìm thấy business rule hoặc validation
+Spec is missing:
+- [ ] No user flow or action sequence found
+- [ ] No business rule or validation found
 
-Đề xuất bổ sung trước khi chạy lại:
-1. Ít nhất 1 user flow (step-by-step: "User làm X → System làm Y")
-2. Ít nhất 1 business rule / validation (ví dụ: "Password phải >= 8 ký tự")
-3. Hành vi mong đợi khi thành công VÀ thất bại
+Suggested additions before rerun:
+1. At least one user flow (step-by-step: "User does X → System does Y")
+2. At least one business rule / validation (e.g., "Password must be >= 8 characters")
+3. Expected behavior for both success AND failure
 
-Test case generation đã dừng. Không có output.
+Test case generation has stopped. No output generated.
 ```
 
 ---
 
-### BƯỚC 2 — Spec Parsing
+### Step 2 — Spec Parsing
 
-Trích xuất từ spec:
-- Tên tính năng (`feature_name`)
-- Mô tả tính năng
-- Các user flow (step-by-step)
-- Business rules và validation rules
+Extract from the spec:
+- Feature name (`feature_name`)
+- Feature description
+- User flows (step-by-step)
+- Business rules and validation rules
 - Boundary conditions
 - Roles / permissions
 - Authentication / session rules
-- Integrations với hệ thống ngoài
+- Integrations with external systems
 
-**Auto-assign Rule IDs** nếu spec không có: Gán `BR-001`, `BR-002`, ... cho từng business rule tìm thấy.
+**Auto-assign Rule IDs** if missing from the spec: assign `BR-001`, `BR-002`, ... for each discovered business rule.
 
 ---
 
-### BƯỚC 3 — Logic Analysis (theo Edge Case Checklist)
+### Step 3 — Logic Analysis (Edge Case Checklist)
 
-Kiểm tra từng mục trong checklist sau. Với mỗi mục **applicable** với spec, phải sinh ít nhất 1 test case:
+Review every checklist section below. For each item that is **applicable** to the spec, generate at least 1 test case.
 
 **5.1 Boundary Values**
-- Min valid value (ví dụ: password đúng 8 ký tự)
-- Max valid value (ví dụ: username đúng 50 ký tự)
+- Min valid value (e.g., password exactly 8 characters)
+- Max valid value (e.g., username exactly 50 characters)
 - One below minimum (fail expected)
 - One above maximum (fail expected)
 - Zero / empty / null
-- Số âm khi chỉ cho phép số dương
-- Decimal khi chỉ cho phép integer
+- Negative number when only positive is allowed
+- Decimal when only integer is allowed
 
 **5.2 String & Input Format**
 - Leading/trailing whitespace
-- All spaces trong required field
-- Ký tự đặc biệt `!@#$%^&*()`
-- Unicode / emoji trong fields không mong đợi
-- Chuỗi rất dài (1000+ ký tự) trong short text field
-- Line breaks trong single-line field
-- HTML tags trong text fields (cũng là Security case)
+- All spaces in required field
+- Special characters `!@#$%^&*()`
+- Unicode / emoji in unexpected fields
+- Very long string (1000+ chars) in short text field
+- Line breaks in single-line field
+- HTML tags in text fields (also a Security case)
 
 **5.3 State & Flow**
-- Action trên entity đã completed
-- Action trên entity đã cancelled/deleted
-- Out-of-order steps (skip step 2 nhảy vào step 3)
-- Double submission (submit 2 lần liên tiếp)
-- Back button / browser navigation sau khi hoàn thành
-- Session expiry giữa chừng flow
-- Concurrent actions (cùng 1 user, 2 tab cùng submit)
+- Action on an already completed entity
+- Action on a cancelled/deleted entity
+- Out-of-order steps (skip step 2 and jump to step 3)
+- Double submission (submit twice rapidly)
+- Back button / browser navigation after completion
+- Session expiry during flow
+- Concurrent actions (same user, 2 tabs submit together)
 
 **5.4 Numeric & Calculation**
-- Zero khi zero là edge hợp lệ
+- Zero when zero is a valid edge
 - Max integer overflow
-- Floating point precision (currency: 0.1 + 0.2 != 0.3)
-- Negative values trong amount/quantity
-- Rounding behavior (up, down, hay truncate?)
+- Floating-point precision (currency: 0.1 + 0.2 != 0.3)
+- Negative values in amount/quantity
+- Rounding behavior (up, down, or truncate)
 
 **5.5 Date & Time**
-- Feb 29 trong năm không nhuận
-- End-of-month (Jan 31 + 1 month = Feb 28 hay Mar 3?)
-- Past dates khi chỉ cho phép future
-- Far-future dates (năm 9999)
+- Feb 29 in a non-leap year
+- End-of-month (Jan 31 + 1 month = Feb 28 or Mar 3?)
+- Past dates when only future dates are allowed
+- Far-future dates (year 9999)
 - Timezone edge cases (midnight crossing)
 - Date format mismatch (DD/MM/YYYY vs MM/DD/YYYY)
 
 **5.6 Permission & Role**
-- Unauthenticated access vào protected endpoint
-- Lower-privilege role truy cập higher-privilege action
-- IDOR: truy cập resource của user khác bằng cách thay ID
-- Expired token / revoked permission giữa session
-- Role thay đổi trong khi user đang đăng nhập
+- Unauthenticated access to protected endpoint
+- Lower-privilege role accessing higher-privilege action
+- IDOR: access another user's resource by modifying ID
+- Expired token / revoked permission during session
+- Role changed while user is still logged in
 
 **5.7 System & Integration**
-- Dependency không available (external API down)
+- Dependency unavailable (external API down)
 - Slow network / timeout (>30s)
-- Partial success (3/5 items saved rồi fail)
-- Duplicate entry trên unique field
-- Empty list / zero results (empty state UI)
-- Pagination edge (trang cuối có đúng 1 item, hoặc 0 item)
+- Partial success (3/5 items saved, then failure)
+- Duplicate entry on unique field
+- Empty list / zero results (empty-state UI)
+- Pagination edge (last page has exactly 1 item or 0 items)
 
-**5.8 Security** (khi `enable_security = true`)
-- SQL Injection trong tất cả text inputs
-- XSS trong fields hiển thị user input
-- CSRF trên state-changing actions (POST/PUT/DELETE)
-- Brute force trên login/OTP/PIN
-- Session fixation/hijacking (reuse old token sau logout)
-- IDOR: access resource bằng cách thay đổi ID
-- Mass assignment: inject unexpected fields trong API body
-- Sensitive data trong URL (password/token trong query string)
+**5.8 Security** (when `enable_security = true`)
+- SQL Injection on all text inputs
+- XSS on fields displaying user input
+- CSRF on state-changing actions (POST/PUT/DELETE)
+- Brute force on login/OTP/PIN
+- Session fixation/hijacking (reuse old token after logout)
+- IDOR: access resources by changing IDs
+- Mass assignment: inject unexpected fields in API body
+- Sensitive data in URL (password/token in query string)
 - Missing rate limiting (rapid repeated requests)
-- Account enumeration (error message tiết lộ account có tồn tại không)
+- Account enumeration (error leaks account existence)
 
 ---
 
-### BƯỚC 4 — Test Case Generation
+### Step 4 — Test Case Generation
 
-Áp dụng **System Prompt Rules** khi sinh từng test case:
+Apply these **System Prompt Rules** when generating each test case:
 
-1. Mỗi TC PHẢI có đủ: ID, Title, Type, Priority, Rule Ref, Precondition, Test Data, Steps (đánh số), Expected Result.
-2. **Steps phải executable** — Không viết "verify system works". Viết chính xác tester phải LÀM gì.
-3. **Expected Result phải verifiable** — Không viết "should work correctly". Viết chính xác tester phải THẤY gì.
-4. **Test Data phải có giá trị cụ thể** — Không viết "enter valid data". Viết giá trị thật (ví dụ: `email: user@test.com`).
-5. Phủ đủ 4 types: Happy Path, Negative, Edge Case, Security.
-6. Mỗi business rule phải được reference bởi ít nhất 1 TC (`rule_ref`).
-7. Không tạo duplicate TC. Nếu 2 rules dẫn đến cùng scenario, merge thành 1 TC với nhiều `rule_ref`.
-8. Assign priority theo bảng Priority Rules (Bước 5).
-9. Output đúng format được yêu cầu. Không thêm commentary ngoài format.
+1. Every TC MUST include: ID, Title, Type, Priority, Rule Ref, Precondition, Test Data, Steps (numbered), Expected Result.
+2. **Steps must be executable** — Avoid vague text like "verify system works". Specify exactly what tester must DO.
+3. **Expected Result must be verifiable** — Avoid "should work correctly". Specify exactly what tester must SEE.
+4. **Test Data must contain concrete values** — Avoid "enter valid data". Provide real values (e.g., `email: user@test.com`).
+5. Cover all 4 types: Happy Path, Negative, Edge Case, Security.
+6. Every business rule must be referenced by at least 1 TC (`rule_ref`).
+7. Do not generate duplicate TCs. If 2 rules map to same scenario, merge into one TC with multiple `rule_ref` values.
+8. Assign priority using Priority Rules (Step 5).
+9. Return output strictly in the requested format. No extra commentary outside that format.
 
-**Coverage theo level:**
+**Coverage by level:**
 
 | Level | Happy Path | Negative | Edge Case | Security | Traceability Matrix |
 |---|---|---|---|---|---|
@@ -202,30 +201,30 @@ Kiểm tra từng mục trong checklist sau. Với mỗi mục **applicable** v�
 | `standard` | Yes | Yes | No | Yes (minimal) | Yes |
 | `full` | Yes | Yes | Yes (full checklist) | Yes (full set) | Yes |
 
-**Security Standard Set** (luôn sinh khi `enable_security = true`):
+**Security Standard Set** (always generate when `enable_security = true`):
 
-| Scenario | Priority | Điều kiện sinh |
+| Scenario | Priority | Generation Condition |
 |---|---|---|
-| SQL Injection trong tất cả text inputs | P1 - Critical | Luôn |
-| XSS trong fields hiển thị user input | P1 - Critical | Luôn |
-| Unauthenticated access to protected endpoint | P1 - Critical | Nếu spec có auth rules |
-| Brute force on login/OTP/PIN | P1 - Critical | Nếu spec có auth rules |
-| IDOR | P1 - Critical | Nếu spec có user-specific resources |
-| Session token valid sau logout | P1 - Critical | Nếu spec có session/auth |
-| Sensitive data trong URL params | P2 - High | Nếu spec có redirects/tokens |
-| Rate limiting trên API endpoints | P2 - High | Nếu spec có API calls |
+| SQL Injection in all text inputs | P1 - Critical | Always |
+| XSS in fields displaying user input | P1 - Critical | Always |
+| Unauthenticated access to protected endpoint | P1 - Critical | If spec includes auth rules |
+| Brute force on login/OTP/PIN | P1 - Critical | If spec includes auth rules |
+| IDOR | P1 - Critical | If spec includes user-specific resources |
+| Session token still valid after logout | P1 - Critical | If spec includes session/auth |
+| Sensitive data in URL params | P2 - High | If spec includes redirects/tokens |
+| Rate limiting on API endpoints | P2 - High | If spec includes API calls |
 
 ---
 
-### BƯỚC 5 — Priority Assignment
+### Step 5 — Priority Assignment
 
 | Scenario | Priority |
 |---|---|
-| Core happy path (feature không hoạt động nếu fail) | P1 - Critical |
-| Tất cả Security cases (auth bypass, injection, IDOR, brute force) | P1 - Critical |
-| Account lockout, rate limiting enforcement | P1 - Critical |
-| Tất cả validation rules chặn main flow | P2 - High |
-| Boundary values tại min/max | P2 - High |
+| Core happy path (feature is broken if this fails) | P1 - Critical |
+| All Security cases (auth bypass, injection, IDOR, brute force) | P1 - Critical |
+| Account lockout, rate-limiting enforcement | P1 - Critical |
+| Validation rules that block main flow | P2 - High |
+| Boundary values at min/max | P2 - High |
 | Permission / role access control | P2 - High |
 | UI/UX messaging (error messages, empty states) | P3 - Medium |
 | Optional fields, non-blocking validations | P3 - Medium |
@@ -233,77 +232,77 @@ Kiểm tra từng mục trong checklist sau. Với mỗi mục **applicable** v�
 
 ---
 
-### BƯỚC 6 — Traceability Check & Coverage Gap Detection
+### Step 6 — Traceability Check & Coverage Gap Detection
 
-Sau khi sinh xong tất cả TC:
+After all test cases are generated:
 
-1. **Map mỗi Rule ID** sang danh sách TC IDs cover nó.
-2. **Flag Coverage Gap:** Rule nào không có TC nào cover → cảnh báo:
+1. **Map each Rule ID** to the list of TC IDs that cover it.
+2. **Flag Coverage Gap:** For any rule not covered by any TC, show warning:
    ```
-   ⚠️ COVERAGE GAP: BR-005 "Remember Me checkbox" chưa có test case.
-     Lý do: Rule tìm thấy trong spec nhưng không có behavior được mô tả.
-     Hành động: Bổ sung expected behavior vào spec, hoặc thêm TC thủ công.
+   ⚠️ COVERAGE GAP: BR-005 "Remember Me checkbox" has no test case.
+     Reason: Rule was found in the spec but behavior is not described.
+     Action: Add expected behavior to the spec, or add a manual TC.
    ```
-3. **Flag Orphaned TC:** TC nào không có `rule_ref` → cảnh báo:
+3. **Flag Orphaned TC:** For any TC without `rule_ref`, show warning:
    ```
-   ⚠️ ORPHANED TC: TC-015 không có rule_ref.
-     Hành động: Xác nhận TC này có chủ đích. Nếu có, thêm rule tương ứng vào spec.
+   ⚠️ ORPHANED TC: TC-015 has no rule_ref.
+     Action: Confirm this TC is intentional. If yes, add corresponding rule to the spec.
    ```
-4. **Tính Coverage %:** `Covered Rules / Total Rules x 100%`
+4. **Calculate Coverage %:** `Covered Rules / Total Rules x 100%`
 
 ---
 
-### BƯỚC 7 — Anti-Pattern Guard & Output Assembly
+### Step 7 — Anti-Pattern Guard & Output Assembly
 
-**Trước khi output**, self-check từng TC theo Anti-Pattern Guard:
+**Before output**, self-check each TC with the Anti-Pattern Guard:
 
-| Anti-Pattern | Ví dụ vi phạm |
+| Anti-Pattern | Violation Example |
 |---|---|
-| Steps vague | "Enter valid information and submit" |
-| Expected result không verify được | "System should work correctly" |
-| Thiếu test data | "Use any email and password" |
-| Duplicate scenario | 2 TC cùng test "empty email field" |
-| Không có rule_ref | TC không gắn với business rule nào |
-| Security case không có exploit vector | "Test if login is secure" |
+| Vague steps | "Enter valid information and submit" |
+| Unverifiable expected result | "System should work correctly" |
+| Missing test data | "Use any email and password" |
+| Duplicate scenario | Two TCs both testing "empty email field" |
+| Missing rule_ref | TC not linked to any business rule |
+| Security case with no exploit vector | "Test if login is secure" |
 
-Nếu TC vi phạm: đánh `status: "needs_review"` và thêm notice:
+If a TC violates rules: set `status: "needs_review"` and add notice:
 
 ```
 ⚠️ QC REVIEW REQUIRED
-Các test case sau bị flag là potentially low quality và cần review thủ công:
+The following test cases were flagged as potentially low quality and require manual review:
 - TC-007: Vague expected result
 - TC-012: Missing test data
-Vui lòng chỉnh sửa trước khi execution.
+Please revise before execution.
 ```
 
-**Assemble output theo thứ tự:**
-1. (nếu applicable) PII Masking Report
-2. (nếu applicable) QC Review Required notice
-3. Test Case List (theo output_format)
+**Assemble output in this order:**
+1. (if applicable) PII Masking Report
+2. (if applicable) QC Review Required notice
+3. Test Case List (by `output_format`)
 4. Traceability Matrix
 5. Coverage Summary
 6. Test Report Template
 
 ---
 
-## Schema Đầu Ra
+## Output Schema
 
-### Schema Test Case (mọi format)
+### Test Case Schema (all formats)
 
-| Field | Type | Mô tả |
+| Field | Type | Description |
 |---|---|---|
 | `id` | string | `TC-001`, `TC-002`, ... (sequential) |
-| `title` | string | Ngắn gọn, action-oriented |
+| `title` | string | Concise, action-oriented |
 | `type` | enum | `Happy Path` / `Negative` / `Edge Case` / `Security` |
 | `priority` | enum | `P1 - Critical` / `P2 - High` / `P3 - Medium` / `P4 - Low` |
-| `rule_ref` | string | Business rule IDs liên quan (vd: `BR-001, BR-002`) |
-| `precondition` | string | Trạng thái hệ thống cần có trước khi test |
-| `test_data` | string | Giá trị dữ liệu cụ thể để dùng khi test |
-| `steps` | list | Các bước thực hiện, đánh số |
-| `expected_result` | string | Kết quả mong đợi có thể verify |
-| `actual_result` | string | Để trống — QC điền khi execution |
-| `status` | enum | `Pass` / `Fail` / `Blocked` / `N/A` — để trống mặc định |
-| `notes` | string | Context bổ sung (edge case rationale, security note) |
+| `rule_ref` | string | Related business rule IDs (e.g., `BR-001, BR-002`) |
+| `precondition` | string | Required system state before execution |
+| `test_data` | string | Concrete values used during test |
+| `steps` | list | Numbered execution steps |
+| `expected_result` | string | Verifiable expected outcome |
+| `actual_result` | string | Leave blank — QC fills during execution |
+| `status` | enum | `Pass` / `Fail` / `Blocked` / `N/A` — default blank |
+| `notes` | string | Extra context (edge rationale, security note) |
 
 ### Markdown Output Structure
 
@@ -345,7 +344,7 @@ Coverage: X/Y rules covered (Z%)
 
 ### JSON Output
 
-Cấu trúc bắt buộc gồm 4 object: `meta`, `test_cases`, `coverage_summary`, `traceability_matrix`.
+Required structure includes 4 objects: `meta`, `test_cases`, `coverage_summary`, `traceability_matrix`.
 
 ```json
 {
@@ -381,15 +380,15 @@ Cấu trúc bắt buộc gồm 4 object: `meta`, `test_cases`, `coverage_summary
 Headers: `id,title,type,priority,rule_ref,precondition,test_data,steps,expected_result,actual_result,status,notes`
 
 Rules:
-- `steps` nối bằng ` | `
-- `rule_ref` nối bằng `;`
-- Tất cả fields được double-quoted
+- Join `steps` using ` | `
+- Join `rule_ref` using `;`
+- Double-quote all fields
 - Encoding: UTF-8 with BOM (Excel compatible)
-- Row đầu tiên luôn là header
+- First row must always be header
 
 ---
 
-## Test Report Template (luôn append vào output)
+## Test Report Template (always append to output)
 
 ```markdown
 ## Test Execution Report
@@ -421,7 +420,7 @@ Rules:
 
 ---
 
-## Ví Dụ Few-Shot
+## Few-Shot Examples
 
 ### ✅ Good — Happy Path
 
@@ -495,7 +494,7 @@ Steps:
 Expected Result: System returns "Invalid credentials" error. No SQL error message or stack trace displayed. Request logged as suspicious in server logs.
 ```
 
-### ❌ Bad — Bị Reject (Vague)
+### ❌ Bad — Rejected (Vague)
 
 ```
 ID: TC-003
@@ -505,35 +504,35 @@ Steps: 1. Enter wrong data 2. Submit
 Expected Result: System shows error
 ```
 
-**Lý do reject:** Steps không executable ("wrong data" là gì?). Expected result không verifiable. Thiếu test data, precondition, rule_ref.
+**Reason for rejection:** Steps are not executable (what is "wrong data"?). Expected result is not verifiable. Missing test data, precondition, and rule_ref.
 
 ---
 
-## Giới Hạn & Ngoài Phạm Vi
+## Limits & Out of Scope
 
-**Skill chỉ sinh:** Manual functional test cases + security test cases.
+**This skill generates only:** Manual functional test cases + security test cases.
 
-**Không thuộc phạm vi:** Selenium/Playwright/Cypress automation scripts, Postman collections, REST Assured, performance/load/stress test plans, penetration testing scripts hoặc exploit code, bug reports, integration với Jira/TestRail.
+**Out of scope:** Selenium/Playwright/Cypress automation scripts, Postman collections, REST Assured, performance/load/stress test plans, penetration testing scripts or exploit code, bug reports, and Jira/TestRail integration.
 
-**Giả định:**
-- Mỗi lần chạy xử lý **một feature**. Spec nhiều feature nên tách ra trước.
-- Spec viết bằng tiếng Anh hoặc tiếng Việt (mixed-language OK).
-- QC review output trước khi execution — skill accelerates, không replace QC judgment.
-- PII Masking bật mặc định. Tắt là trách nhiệm của người dùng.
+**Assumptions:**
+- Each run handles **one feature**. Multi-feature specs should be split first.
+- Spec may be written in English or Vietnamese (mixed-language is acceptable).
+- QC reviews output before execution — this skill accelerates work, not replaces QC judgment.
+- PII Masking is enabled by default. Disabling it is the user's responsibility.
 
 ---
 
 ## Success Criteria
 
-Output đạt yêu cầu khi:
+The output is acceptable when:
 
-- [ ] Mọi business rule có ít nhất 1 TC (`rule_ref` populated)
-- [ ] Mọi user flow step được exercise trong ít nhất 1 TC
-- [ ] Đủ 4 types: Happy Path, Negative, Edge Case, Security (với `standard`/`full`)
-- [ ] Tất cả TCs có đầy đủ required fields
-- [ ] Không TC nào vi phạm Anti-Pattern Guard
-- [ ] Traceability Matrix đầy đủ — không có uncovered rules, không có orphaned TCs
-- [ ] Coverage >= 100% (tất cả rules được cover)
-- [ ] PII Masking report được sinh (khi `mask_pii = true`)
-- [ ] JSON output valid theo schema; CSV parseable bởi Excel/Python
-- [ ] QC chỉ cần minor edits trước khi dùng output
+- [ ] Every business rule has at least 1 TC (`rule_ref` populated)
+- [ ] Every user-flow step is exercised by at least 1 TC
+- [ ] All 4 types are present: Happy Path, Negative, Edge Case, Security (for `standard`/`full`)
+- [ ] All TCs contain all required fields
+- [ ] No TC violates Anti-Pattern Guard
+- [ ] Traceability Matrix is complete — no uncovered rules and no orphaned TCs
+- [ ] Coverage >= 100% (all rules are covered)
+- [ ] PII Masking report is generated (when `mask_pii = true`)
+- [ ] JSON output is schema-valid; CSV is parseable by Excel/Python
+- [ ] QC needs only minor edits before using output
