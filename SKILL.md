@@ -192,6 +192,17 @@ Total: N flows
 - Estimated TC count: ~N (based on N rules × coverage_level multiplier)
 - Traceability matrix: [included | skipped — basic mode]
 
+### Spec Gaps Detected
+| Gap Type                          | Detected? | Impact on TC Generation                        |
+|-----------------------------------|-----------|------------------------------------------------|
+| No failure/error scenarios        | Yes / No  | Negative cases will be inferred, not spec-driven |
+| No boundary conditions in rules   | Yes / No  | Boundary Edge Cases may be skipped             |
+| Vague expected behavior           | Yes / No  | Affected TCs will have [VERIFY] placeholders   |
+| External dependency unspecified   | Yes / No  | Affected TCs will have [NOT SPECIFIED] markers |
+| No roles or permissions defined   | Yes / No  | IDOR and permission security cases skipped     |
+| Contradictory rules detected      | Yes / No  | Conflicting TCs will be flagged                |
+| Only happy path described         | Yes / No  | Negative cases will have lower coverage        |
+
 ---
 Proceeding to test case generation...
 ```
@@ -701,17 +712,124 @@ Expected Result: System shows error
 
 ---
 
+## Spec Gap Handling
+
+When the spec passes Step 1 validation but still contains gaps, the skill does **not stop** — it enters **degraded mode**: generates what it can, marks affected TCs as `needs_review`, and emits targeted warnings so QC knows exactly what is incomplete and why.
+
+### Gap Types, Detection, and Response
+
+| Gap Type | How Detected | Skill Response | Warning |
+|---|---|---|---|
+| No failure / error scenarios described | No failure paths, no "on failure", no error conditions in any flow | Negative cases inferred from validation rules only; marked `needs_review` | WARN-002 |
+| No boundary conditions in any rule | No min / max / range / limit keyword in business rules | Boundary Edge Cases skipped; coverage gap flagged in traceability matrix | WARN-003 |
+| Vague expected behavior | Expected behavior uses imprecise language: "shows message", "handles error", "works correctly" | TC generated with `[VERIFY: specify exact message/behavior]` in `expected_result` | `needs_review` |
+| External dependency described but behavior not specified | "calls API", "sends notification", "triggers webhook" — external system response not described | TC generated with `[NOT SPECIFIED: add expected behavior of external system]` in relevant step | `needs_review` |
+| No roles or permissions defined | No role keywords found: admin, guest, authenticated, permission, authorized, unauthorized | IDOR and permission security cases skipped; partial security coverage noted | WARN-004 |
+| Contradictory business rules | Rule A and Rule B describe conflicting behavior for the same input/state | One TC generated per interpretation; both flagged with contradiction note in `notes` field | WARN-005 |
+| Only happy path described — no alt flows | No alternative flows, no locked/blocked states, no error handling flows | Negative cases generated from validation rules only; coverage will be lower than `coverage_level` expects | WARN-006 |
+
+### Warning Format
+
+All WARN-002 through WARN-006 use this structure:
+
+```
+⚠️ WARN-[code]: SPEC GAP DETECTED
+
+Gap type: [name from table above]
+Affected TC types: [Negative | Edge Case | Security | all]
+Impact: [what was skipped or degraded, in plain language]
+Recommendation: [specific addition needed in the spec to resolve this gap]
+TCs affected: [TC IDs, or "applied to all Negative cases" if pre-generation]
+```
+
+### Examples
+
+**WARN-002 — No failure scenarios:**
+```
+⚠️ WARN-002: SPEC GAP DETECTED
+
+Gap type: No failure / error scenarios described
+Affected TC types: Negative
+Impact: Negative cases were inferred from validation rules only.
+        Failure paths (network error, timeout, server 5xx) could not be generated
+        because the spec does not describe system behavior on failure.
+Recommendation: Add failure scenarios to the spec, e.g.:
+  - "On network timeout → display: 'Request timed out. Please try again.'"
+  - "On server error (5xx) → display: 'Something went wrong. Please try again later.'"
+TCs affected: TC-003, TC-004, TC-005 (marked needs_review)
+```
+
+**WARN-004 — No roles defined:**
+```
+⚠️ WARN-004: SPEC GAP DETECTED
+
+Gap type: No roles or permissions defined
+Affected TC types: Security (IDOR, permission escalation)
+Impact: Cannot generate IDOR or role-based access control test cases.
+        The spec does not mention any user roles, access levels, or
+        authenticated vs. unauthenticated distinctions.
+Recommendation: Add role definitions to the spec, e.g.:
+  - "Only authenticated users can access this feature"
+  - "Admin role can edit; regular users can only view"
+TCs affected: Security cases for IDOR and permission escalation were skipped entirely.
+```
+
+**Vague expected behavior — `needs_review` example:**
+```
+TC-007
+Title: Submit form with all valid fields
+Expected Result: System processes the request successfully. [VERIFY: specify the exact
+                 success message, redirect URL, or UI change the tester should observe]
+Status: needs_review
+Notes: Spec states "system handles the submission" without defining observable outcome.
+       QC must verify and fill in the exact expected result before executing this TC.
+```
+
+### Degraded Mode Output Header
+
+When any WARN-002 through WARN-006 is triggered, the output includes this notice at the top:
+
+```
+⚠️ DEGRADED OUTPUT — SPEC GAPS DETECTED
+
+This output was generated in degraded mode. Some test cases could not be fully
+generated due to missing information in the spec. Review all warnings below and
+the [VERIFY] / [NOT SPECIFIED] placeholders in affected test cases before execution.
+
+Warnings issued: WARN-[codes]
+TCs marked needs_review: N
+```
+
+---
+
 ## Limits & Out of Scope
+
+### Skill Limitations
+
+These are hard limits — the skill cannot produce reliable output beyond these boundaries regardless of `coverage_level` or `enable_security` settings:
+
+| Limitation | Explanation |
+|---|---|
+| Only tests **explicitly stated** behaviors | The skill does not infer unstated business logic. If the spec says "validate email" but doesn't define what "valid" means, the skill cannot determine what the pass/fail criteria are. Exception: the Security Standard Set is always generated based on feature type, not spec text. |
+| Cannot determine correct expected results from vague spec language | "System shows an error" is not a testable expected result. The skill will generate the TC but mark it `needs_review` with a `[VERIFY]` placeholder. QC must fill in the exact observable outcome. |
+| Cannot describe external system behavior | If the spec says "system sends an SMS" but doesn't describe what the SMS contains or when it arrives, the skill cannot write a verifiable expected result for that TC. |
+| Cannot handle multi-feature specs | Each run handles exactly one feature. If the spec covers multiple features (e.g., Login + Registration + Password Reset in one document), split it before input. |
+| Cannot generate test data for domain-specific formats | The skill uses generic valid test data (emails, passwords, numbers). It cannot generate domain-specific data like valid IBAN numbers, NPI codes, or SWIFT codes unless the spec defines the format explicitly. |
+| Cannot validate that generated test data works in target environment | Test data like `user@test.com` is syntactically valid but may not exist in the test environment. QC must substitute real accounts/data during execution. |
+| Cannot detect missing features | The skill generates TCs for what the spec describes. It cannot identify that a feature is missing from the spec (e.g., "forgot password" flow not mentioned). |
+
+### Out of Scope
 
 **This skill generates only:** Manual functional test cases + security test cases.
 
-**Out of scope:** Selenium/Playwright/Cypress automation scripts, Postman collections, REST Assured, performance/load/stress test plans, penetration testing scripts or exploit code, bug reports, and Jira/TestRail integration.
+**Not generated by this skill:** Selenium / Playwright / Cypress automation scripts, Postman collections, REST Assured scripts, performance / load / stress test plans, penetration testing scripts or exploit code, bug reports, Jira / TestRail import files.
 
-**Assumptions:**
-- Each run handles **one feature**. Multi-feature specs should be split first.
+### Assumptions
+
+- Each run handles **one feature**. Multi-feature specs must be split before input.
 - Spec may be written in English or Vietnamese (mixed-language is acceptable).
-- QC reviews output before execution — this skill accelerates work, not replaces QC judgment.
-- PII Masking is enabled by default. Disabling it is the user's responsibility.
+- QC reviews output before execution — this skill accelerates work, it does not replace QC judgment.
+- PII Masking is enabled by default. Disabling it is the user's explicit responsibility.
 
 ---
 
