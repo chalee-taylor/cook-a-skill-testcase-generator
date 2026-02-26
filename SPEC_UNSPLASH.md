@@ -12,7 +12,7 @@
 
 > **Đây là Bước 3 trong quy trình Cook-A-Skill.** Spec này được thiết kế để feed trực tiếp vào skill **Test Case Generator** (xem `SPEC.md`). Mỗi feature section bên dưới đã có đủ Input / Output / Workflow để skill có thể generate test cases chất lượng cao ngay lập tức.
 
-### INPUT → Skill
+### Input
 
 | Field | Value | Note |
 |---|---|---|
@@ -23,7 +23,7 @@
 | `enable_security` | `true` | Luôn bật cho web app |
 | `mask_pii` | `true` | Luôn bật — spec không chứa PII thật |
 
-### OUTPUT ← Skill
+### Output
 
 | Thành phần | Mô tả |
 |---|---|
@@ -32,7 +32,7 @@
 | Coverage Summary | Tổng số TC theo từng loại |
 | Test Report Template | Template điền kết quả sau khi chạy |
 
-### WORKFLOW — Quy trình sử dụng Spec này
+### Workflow
 
 ```
 Bước 1: Chọn 1 feature từ Table of Contents bên dưới
@@ -56,7 +56,7 @@ Bước 6: Review output — refine spec nếu cần, re-run
 Bước 7: Export ra Markdown / JSON / CSV để dùng trong test session
 ```
 
-### Phân tích Pain Point (Bước 1 của Cook-A-Skill)
+### Pain Point Analysis
 
 | Vấn đề khi viết TC thủ công | Skill giải quyết thế nào |
 |---|---|
@@ -118,8 +118,6 @@ Unsplash is a community-powered visual platform providing over 6 million high-re
 ### Description
 
 Users can search for photos by keyword using the search bar. Results include photos, collections, and user profiles. The homepage displays an infinite-scroll grid of curated photos. Discovery is supported through trending tags and themed category navigation.
-
----
 
 ### Input
 
@@ -203,8 +201,6 @@ Users can search for photos by keyword using the search bar. Results include pho
 
 Users can download free photos without creating an account. Each photo has a "Download free" button. Premium photos (Unsplash+) require an active subscription. Downloaded photos are provided in high resolution.
 
----
-
 ### Input
 
 | Element | Type | Required | Constraints | Description |
@@ -238,12 +234,19 @@ Users can download free photos without creating an account. Each photo has a "Do
 7. System initiates JPEG file download to user's device
 8. Download count on the photo increments by 1
 
-#### Alternative Flow — Unsplash+ Premium Photo
+#### Alternative Flow — Premium Photo (Active Subscriber)
 
 1. User clicks on a photo with a lock icon overlay
 2. System displays: `"This photo requires Unsplash+"` with a `"Subscribe"` CTA button
-3. **If user has active subscription:** Download proceeds at full quality, no watermark
-4. **If user has no subscription:** User is redirected to the Unsplash+ subscription page
+3. System checks subscription status → active subscription confirmed
+4. Download proceeds at full quality without watermark
+
+#### Alternative Flow — Premium Photo (No Subscription)
+
+1. User clicks on a photo with a lock icon overlay
+2. System displays: `"This photo requires Unsplash+"` with a `"Subscribe"` CTA button
+3. System checks subscription status → no active subscription found
+4. User is redirected to the Unsplash+ subscription page (`https://unsplash.com/plus`)
 
 ### Business Rules
 
@@ -276,8 +279,6 @@ Users can download free photos without creating an account. Each photo has a "Do
 ### Description
 
 Users can create an account with email/password or via Google/Facebook OAuth. Registration unlocks additional features: liking photos, creating collections, uploading photos, and accessing Unsplash+.
-
----
 
 ### Input
 
@@ -398,8 +399,6 @@ Users can create an account with email/password or via Google/Facebook OAuth. Re
 
 Registered users can submit photos to Unsplash. Uploaded photos are reviewed against submission guidelines. Approved photos become part of the public library under the Unsplash license.
 
----
-
 ### Input
 
 | Element | Type | Required | Constraints | Description |
@@ -438,11 +437,16 @@ Registered users can submit photos to Unsplash. Uploaded photos are reviewed aga
 7. User clicks `"Submit"` to confirm
 8. System uploads the photo and sets its status to `"Under Review"`
 9. System sends a confirmation notification to the contributor
-10. Upon admin approval → photo is published to the public library
+
+#### Alternative Flow — Admin Approval
+
+1. Admin reviews the submitted photo
+2. Admin approves the photo
+3. System publishes the photo to the public library; status changes to `"Published"`
 
 #### Alternative Flow — Admin Rejection
 
-1. Admin reviews the submitted photo and determines it violates guidelines
+1. Admin reviews the submitted photo and determines it violates submission guidelines
 2. System sends an explanatory rejection email to the contributor
 3. Photo is removed from the contributor's profile
 
@@ -486,8 +490,6 @@ Registered users can submit photos to Unsplash. Uploaded photos are reviewed aga
 ### Description
 
 Registered users can create collections to organize and save photos. Collections can be public or private. Other users can follow public collections.
-
----
 
 ### Input
 
@@ -539,7 +541,7 @@ Registered users can create collections to organize and save photos. Collections
 4. User clicks a collection (without checkmark)
 5. System adds the photo; checkmark appears; photo contributor receives a notification
 
-#### Happy Path — Delete a Collection
+#### Alternative Flow — Delete a Collection
 
 1. User navigates to their profile → Collections tab
 2. User selects the collection to delete
@@ -584,8 +586,6 @@ Registered users can create collections to organize and save photos. Collections
 ### Description
 
 Authenticated users can "like" (heart) photos to show appreciation to photographers and to save them to a personal likes list.
-
----
 
 ### Input
 
@@ -653,8 +653,6 @@ Authenticated users can "like" (heart) photos to show appreciation to photograph
 ### Description
 
 Every registered user has a public profile page showing their uploaded photos, liked photos, and collections. Users can edit their profile information.
-
----
 
 ### Input
 
@@ -749,8 +747,6 @@ Every registered user has a public profile page showing their uploaded photos, l
 
 Unsplash+ is a premium subscription tier that gives users access to exclusive licensed photos not available for free. Unsplash+ photos are marked with a lock icon.
 
----
-
 ### Input
 
 #### Subscribe
@@ -793,7 +789,7 @@ Unsplash+ is a premium subscription tier that gives users access to exclusive li
 8. On success: Unsplash+ subscription activated; confirmation email sent; user redirected to premium library
 9. On failure: Stripe error returned; system displays `"Payment failed — please check your card details"`
 
-#### Happy Path — Cancel Subscription
+#### Alternative Flow — Cancel Subscription
 
 1. Authenticated Unsplash+ subscriber goes to Account Settings → Billing
 2. User clicks `"Cancel subscription"`
@@ -835,8 +831,6 @@ Unsplash+ is a premium subscription tier that gives users access to exclusive li
 ### Description
 
 Unsplash provides a Visual Search tool that allows users to search by image rather than keyword. Users can upload an image or paste a URL to find visually similar photos.
-
----
 
 ### Input
 
@@ -905,8 +899,6 @@ Unsplash provides a Visual Search tool that allows users to search by image rath
 ### Description
 
 Unsplash provides a public REST API for developers to integrate Unsplash photos into applications. API access requires registration and app approval.
-
----
 
 ### Input
 
